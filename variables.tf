@@ -91,5 +91,5 @@ variable "database_tier" {
 variable "database_deletion_protection" {
   description = "Protect the database from accidental Terraform deletion."
   type        = bool
-  default     = true
+  default     = false
 }
