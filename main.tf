@@ -3,7 +3,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0.2"
+      version = "~> 3.0"
     }
   }
 
@@ -132,4 +132,29 @@ resource "azurerm_network_security_group" "nsg-db" {
 resource "azurerm_subnet_network_security_group_association" "db-nsg-association" {
   subnet_id                 = azurerm_subnet.task-manager-private-subnet.id
   network_security_group_id = azurerm_network_security_group.nsg-db.id
+}
+
+resource "azurerm_kubernetes_cluster" "aks" {
+  name                = "aks-non-prod"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  dns_prefix          = "task-manager"
+
+  default_node_pool {
+    name       = "system"
+    node_count = 2
+    vm_size    = "Standard_D2s_v3"
+    vnet_subnet_id = azurerm_subnet.task-manager-public-subnet.id
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  network_profile {
+    network_plugin     = "azure"
+    load_balancer_sku  = "standard"
+    service_cidr       = "10.1.0.0/16"
+    dns_service_ip     = "10.1.0.10"
+  }
 }
