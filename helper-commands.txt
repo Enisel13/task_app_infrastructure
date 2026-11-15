@@ -1,3 +1,6 @@
 за да push-на image в registry-то в azure
 docker tag task-manager-app:v6 containerregistrytaskmanager.azurecr.io/task-manager-app:v6
 docker push containerregistrytaskmanager.azurecr.io/task-manager-app:v6
+
+
+kubectl annotate serviceaccount default -n default azure.workload.identity/client-id="0a786332-82c1-468b-8f65-58572e197e69"

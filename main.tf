@@ -147,6 +147,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   resource_group_name = azurerm_resource_group.rg.name
   dns_prefix          = "task-manager"
   oidc_issuer_enabled = true
+  workload_identity_enabled = true
+  key_vault_secrets_provider {
+    secret_rotation_enabled = true
+  }
   default_node_pool {
     name       = "system"
     node_count = 1
@@ -183,4 +187,55 @@ resource "azurerm_role_assignment" "aks-acr-role-assignment" {
   skip_service_principal_aad_check = true
 }
 
+#Кey vault за да може да се съхраняват secrets и да се използват от AKS
+data "azurerm_client_config" "current" {}
 
+resource "azurerm_key_vault" "task-manager-key-vault" {
+  name                        = "taskmanagerekeyvault"
+  location                    = azurerm_resource_group.rg.location
+  resource_group_name         = azurerm_resource_group.rg.name
+  enable_rbac_authorization   = true
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+
+  sku_name = "standard"
+}
+
+#нещо като приложението да има карта за да може да се свързва с key vault-a и да взима secrets от него
+resource "azurerm_user_assigned_identity" "app" {
+  name                = "task-manager-app-identity"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+}
+ 
+resource "azurerm_federated_identity_credential" "app" {
+  name                = "task-manager-app-fic"
+  resource_group_name = azurerm_resource_group.rg.name
+  parent_id           = azurerm_user_assigned_identity.app.id
+ 
+  audience = ["api://AzureADTokenExchange"]
+  issuer   = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+  subject  = "system:serviceaccount:default:default"
+}
+ 
+#дава права на приложението да чете secrets от key vault-a
+resource "azurerm_role_assignment" "app_kv_reader" {
+  scope                = azurerm_key_vault.task-manager-key-vault.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
+}
+
+output "app_identity_client_id" {
+  value = azurerm_user_assigned_identity.app.client_id
+}
+
+output "mysql_fqdn" {
+  value = azurerm_mysql_flexible_server.task-manager-server.fqdn
+}
+
+output "kv_name" {
+  value = azurerm_key_vault.task-manager-key-vault.name
+}
+
+output "tenant_id" {
+  value = data.azurerm_client_config.current.tenant_id
+}
