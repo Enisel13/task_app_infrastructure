@@ -11,7 +11,14 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    # Enable soft delete and purge protection for Key Vaults
+    #Трябва ми за да може да се създаде secret в key vault-a и да се използва от AKS
+    key_vault {
+      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults = true
+    }
+  }
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -167,9 +174,13 @@ resource "azurerm_container_registry" "acr" {
   admin_enabled       = false
 }
 
-resource "azurerm_role_assignment" "example" {
+#да може AKS да pull-ва images от ACR
+#(Attaching a Container Registry to a Kubernetes Cluster)
+resource "azurerm_role_assignment" "aks-acr-role-assignment" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
   scope                            = azurerm_container_registry.acr.id
   skip_service_principal_aad_check = true
 }
+
+

@@ -1,0 +1,3 @@
+за да push-на image в registry-то в azure
+docker tag task-manager-app:v6 containerregistrytaskmanager.azurecr.io/task-manager-app:v6
+docker push containerregistrytaskmanager.azurecr.io/task-manager-app:v6
