@@ -112,8 +112,8 @@ resource "azurerm_network_security_group" "nsg-db" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "3306"
-    source_address_prefix      = "10.0.1.0/24"
-    destination_address_prefix = "10.0.2.0/24"
+    source_address_prefix      = "10.0.1.0/24" // Allow traffic from the AKS public subnet 
+    destination_address_prefix = "10.0.2.0/24" // Allow traffic to the MySQL private subnet 
   }
 
   security_rule {
@@ -124,8 +124,8 @@ resource "azurerm_network_security_group" "nsg-db" {
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = "Internet"
-    destination_address_prefix = "*"
+    source_address_prefix      = "Internet" // Deny all inbound traffic from the internet
+    destination_address_prefix = "*"        // Deny all inbound traffic to any destination
   }
 }
 
@@ -139,7 +139,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   dns_prefix          = "task-manager"
-
+  oidc_issuer_enabled = true
   default_node_pool {
     name       = "system"
     node_count = 1
@@ -154,7 +154,22 @@ resource "azurerm_kubernetes_cluster" "aks" {
   network_profile {
     network_plugin     = "azure"
     load_balancer_sku  = "standard"
-    service_cidr       = "10.1.0.0/16"
-    dns_service_ip     = "10.1.0.10"
+    service_cidr       = "10.1.0.0/16"  // Service CIDR for the AKS cluster (to learn more bout it)
+    dns_service_ip     = "10.1.0.10" // DNS service IP within the service CIDR
   }
+}
+
+resource "azurerm_container_registry" "acr" {
+  name                = "containerRegistryTaskManager"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+  admin_enabled       = false
+}
+
+resource "azurerm_role_assignment" "example" {
+  principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = azurerm_container_registry.acr.id
+  skip_service_principal_aad_check = true
 }
