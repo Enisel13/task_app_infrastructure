@@ -13,7 +13,7 @@ terraform {
 provider "azurerm" {
   features {
     # Enable soft delete and purge protection for Key Vaults
-    #Трябва ми за да може да се създаде secret в key vault-a и да се използва от AKS
+    #I need it so that a secret can be created in the Key Vault and used by AKS
     key_vault {
       purge_soft_delete_on_destroy    = true
       recover_soft_deleted_key_vaults = true
@@ -58,7 +58,7 @@ resource "azurerm_subnet" "task-manager-private-subnet" {
   }
 }
 
-#Създава private dns url за да може application-a да се връзвa с базата 
+  #Creates a private DNS URL so that the application can connect to the database
 resource "azurerm_private_dns_zone" "task-manager-private-dns-zone" {
   name                = "task-manager-private-dns-zone.mysql.database.azure.com"
   resource_group_name = azurerm_resource_group.rg.name
@@ -72,8 +72,8 @@ resource "azurerm_private_dns_zone_virtual_network_link" "task-manager-private-d
 }
 
 
-#Това е managed услуга в самия azure (managed mysql database) azure поддържа базата и azure се грижи да е up and running
-#тук живее базата
+#a managed service within Azure (a managed MySQL database); Azure maintains the database and ensures it is up and running.
+#this is where the database lives
 
 resource "azurerm_mysql_flexible_server" "task-manager-server" {
     name                   = "task-manager-mysql-flexible-server"
@@ -85,18 +85,18 @@ resource "azurerm_mysql_flexible_server" "task-manager-server" {
     zone                   = "2"
     private_dns_zone_id    = azurerm_private_dns_zone.task-manager-private-dns-zone.id
 
-    #създавам базата в private sybnet-а
+    #creating the database in the private subnet
     delegated_subnet_id = azurerm_subnet.task-manager-private-subnet.id
 
     storage {
         size_gb = 20
     }
 
-    #първо трябва да се създаде url за да може да се свързва
+    #First, a URL must be created to enable a connection.
     depends_on = [azurerm_private_dns_zone_virtual_network_link.task-manager-private-dns-zone-virtual-network-link]
 }
 
-#самата база която е в azurerm_mysql_flexible_server
+#the actual database that lives in azurerm_mysql_flexible_server
 resource "azurerm_mysql_flexible_database" "task-manager-database" {
   name                = "tasks_db"
   resource_group_name = azurerm_resource_group.rg.name
@@ -104,8 +104,8 @@ resource "azurerm_mysql_flexible_database" "task-manager-database" {
   charset             = "utf8"
   collation           = "utf8_unicode_ci"
 }
-
-#Създавам Security group които да определят inbound and outbound трафик
+ 
+#Create a network security group (NSG) to control inbound and outbound traffic to the MySQL flexible server
 resource "azurerm_network_security_group" "nsg-db" {
   name                = "nsg-db"
   location            = azurerm_resource_group.rg.location
@@ -177,8 +177,8 @@ resource "azurerm_container_registry" "acr" {
   sku                 = "Basic"
   admin_enabled       = false
 }
-
-#да може AKS да pull-ва images от ACR
+  
+#allow AKS to pull images from ACR
 #(Attaching a Container Registry to a Kubernetes Cluster)
 resource "azurerm_role_assignment" "aks-acr-role-assignment" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
@@ -187,7 +187,7 @@ resource "azurerm_role_assignment" "aks-acr-role-assignment" {
   skip_service_principal_aad_check = true
 }
 
-#Кey vault за да може да се съхраняват secrets и да се използват от AKS
+#Key vault for storing secrets and making them available to AKS
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "task-manager-key-vault" {
@@ -200,7 +200,7 @@ resource "azurerm_key_vault" "task-manager-key-vault" {
   sku_name = "standard"
 }
 
-#нещо като приложението да има карта за да може да се свързва с key vault-a и да взима secrets от него
+#something like the application having a map to connect to the key vault and retrieve secrets
 resource "azurerm_user_assigned_identity" "app" {
   name                = "task-manager-app-identity"
   location            = azurerm_resource_group.rg.location
@@ -217,7 +217,7 @@ resource "azurerm_federated_identity_credential" "app" {
   subject  = "system:serviceaccount:default:default"
 }
  
-#дава права на приложението да чете secrets от key vault-a
+#give the application permission to read secrets from the key vault
 resource "azurerm_role_assignment" "app_kv_reader" {
   scope                = azurerm_key_vault.task-manager-key-vault.id
   role_definition_name = "Key Vault Secrets User"
